@@ -1,4 +1,4 @@
-# My-Projects
+# Autonomous buggy group project
 These files contain the code we developed for our second-year project. 
 The project consisted of building an autonomous buggy that followed a white line. 
 The code was written in C/C++ and various pre-written libraries were utilized. 
