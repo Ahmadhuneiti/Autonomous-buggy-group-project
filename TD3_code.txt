@@ -1,0 +1,126 @@
+#include "Arduino.h"
+#include "ReflectanceSensor.h"
+#include "MotorDriver.h"
+
+// global variables
+volatile int count; 
+
+ float Kp= 0.1;
+ float Ki= 0.1;
+ float Kd= 0.1;
+
+volatile float prevref=0.0;
+volatile float prevtimeouter=0.0;
+volatile float prevtimeinner=0.0;
+float err;
+
+
+
+
+uint8_t SensorCount = 6;                                  // Number of refectance sensors
+uint8_t SensorPins[6] = {23, 22, 19, 27, 25, 32};         // Sensor pins
+uint32_t Timeout = 2500;                                  // Sensor reflect timeout (us)
+
+ReflectanceSensor sensor;
+
+//Right Motor Configuration Variables
+int motR_pins[3] = {4, 15, 18};     //Define the Motor Pins
+int motR_sign = -1;                 //Define the motor rotation sign
+
+//Left Motor configuration variables
+int motL_pins[3] = {2, 12, 0};
+int motL_sign = 1;
+
+MotorDriver Mr;
+MotorDriver Ml;
+
+
+
+
+
+void setup() {
+
+//Set up the Motors
+  //Setup the Right Motor object
+  Mr.SetBaseFreq(5000);                                             //PWM base frequency setup
+  Mr.SetSign(motR_sign);                                            //Setup motor sign
+  Mr.DriverSetup(motR_pins[0], 0, motR_pins[1], motR_pins[2]);      //Setup motor pins and channel
+  Mr.MotorWrite(0);                                                 //Write 0 velocity to the motor when initialising
+
+  //Setup the Left Motor object
+  Ml.SetBaseFreq(5000);
+  Ml.SetSign(motL_sign);
+  Ml.DriverSetup(motL_pins[0], 1, motL_pins[1], motL_pins[2]);
+  Ml.MotorWrite(0);
+
+
+  sensor.SetSensorPins(SensorPins,SensorCount);           // Set the sensor pins
+  sensor.SetTimeout(Timeout);                             // Set sensor timeout (us)
+ 
+
+  
+  //Begin Serial Communication
+  Serial.begin(115200);
+
+}
+
+
+float getreadings(){ // this function converts the readings between 1 and -1 to make it similar to the one we used in matlab
+int maxi=0, mini=0;
+float value;
+sensor.ReadSensor();
+
+for (int i=0; i<sensor.GetSensorCount (); i++)
+    {if(mini==0)
+        if(sensor.GetSensorValues(i)<700)
+            mini=i;
+
+       if(maxi==0)
+        if(sensor.GetSensorValues(sensor.GetSensorCount ()-i-1)<700)
+            maxi=sensor.GetSensorCount()-1-i;
+
+    }
+ value= ((float(mini)+float(maxi))/2-3.5)/2.5;
+ return value;
+
+  
+}
+
+void loop() {
+
+  float reflectance= getreadings();
+  Serial.println(reflectance);
+  float currentouter=millis();
+  float dtouter= currentouter-prevtimeouter;
+
+  if (reflectance == -1.4){
+
+    Mr.MotorWrite(0);
+    Ml.MotorWrite(0);
+  }
+  else {
+ if (dtouter> 30){
+
+    prevtimeouter=millis();
+    
+   err = Kp*(reflectance)  + Ki*reflectance*(dtouter/1000.0) + Kd*(reflectance-prevref)/(dtouter/1000.0);
+  prevref= reflectance;
+  
+  
+ }
+
+ float currentinner=millis();
+ float dtinner=currentinner-prevtimeinner;
+ if(dtinner>50){
+
+prevtimeinner=millis();
+
+Mr.MotorWrite(0.1 + float (err));
+Ml.MotorWrite(0.1 - float (err));
+
+  Serial.printf("reflectance %f",reflectance);
+  Serial.println();
+ }
+  
+  }
+}

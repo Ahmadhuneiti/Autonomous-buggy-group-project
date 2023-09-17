@@ -1,0 +1,80 @@
+function my_alg = sonar(my_alg, robot)
+
+if my_alg('is_first_time')
+    %% Setup initial parameters here
+    
+    my_alg('dc_motor_signal_mode') = 'voltage_pwm';     % change if necessary to 'omega_setpoint'
+    
+    % Initialise vectors for saving velocity data
+    my_alg('dist_values') = [];
+
+    % Initialise time parameters
+    my_alg('outer_sampling') = 0.000001;
+    my_alg('inner_sampling') = 0.000001;
+    my_alg('outer_loop') = tic;
+    my_alg('inner_loop') = tic;
+    my_alg('t_finish') =30;
+end
+
+%% Loop code runs here
+
+time = toc(my_alg('tic'));       % Get time since start of session
+ dist =4;
+ err=0;
+ prev_dist=0;
+  diff_dist =0;
+ if time < (my_alg('t_finish')+1)     % Check for algorithm finish time
+    
+    %% outer loop
+    
+    dt = toc(my_alg('outer_loop'));
+    
+    if dt>my_alg('outer_sampling')   % execute code when desired sampling time is reached
+        my_alg('outer_loop') = tic;
+        
+        %% Add your loop code here %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      dist = my_alg('sonar');     
+      diff_dist = dist-1;
+      if(diff_dist<0.99 && diff_dist> -0.99)
+      my_alg('dist_values') = [ my_alg('dist_values'),dist]
+      Kp = 0.001;
+      Ki = 0.001;
+      Kd = 0.00095;
+      err = Kp*diff_dist + prev_dist + Ki*diff_dist*dt + Kd*(diff_dist-prev_dist)/dt;
+      prev_dist = diff_dist;
+      else
+      err=0;   
+      end
+    end
+       
+    
+    %% inner loop 
+    
+    dt = toc(my_alg('inner_loop'));
+    
+    if dt>my_alg('inner_sampling')   % execute code when desired sampling time is reached
+        my_alg('inner_loop') = tic;
+        
+         if( time<  my_alg('t_finish'))      %move while distance smaller than 3 meters
+      my_alg('servo motor')= 1.57;
+             % Apply pwm signal (range is [-1,1])
+        my_alg('right motor') = 0.5 + err;
+        my_alg('left motor') = 0.5 - err;
+
+   
+         else
+             
+        my_alg('right motor') = 0;
+        my_alg('left motor') = 0;
+        %plot the graph of distectance
+        figure(2);
+        plot( my_alg('dist_values'));
+        % Stop session
+        my_alg('is_done') = true;
+         end
+   end
+
+   
+end
+
+return
